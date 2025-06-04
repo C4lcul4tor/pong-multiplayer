@@ -31,23 +31,46 @@ function createNewRoom(): GameRoom {
   };
 }
 
+function resetBall(ball: { x: number; y: number; vx: number; vy: number }) {
+  ball.x = 50;
+  ball.y = 50;
+  ball.vx = Math.random() > 0.5 ? 0.5 : -0.5;
+  ball.vy = (Math.random() - 0.5) * 1;
+}
+
+function resetGame(room: GameRoom) {
+  room.ball = { x: 50, y: 50, vx: 0.5, vy: 0.5 };
+  room.score = { left: 0, right: 0 };
+}
+
 function gameLoop() {
   for (const roomId in rooms) {
     const room = rooms[roomId];
     const ball = room.ball;
 
-    // Move ball
+    // Stop game if there's a winner
+    if (room.score.left >= 5 || room.score.right >= 5) {
+      io.to(roomId).emit("game_state", {
+        players: room.players,
+        ball: room.ball,
+        score: room.score,
+        winner: room.score.left >= 5 ? "Left Player" : "Right Player",
+      });
+      continue;
+    }
+
+    // Ball movement
     ball.x += ball.vx;
     ball.y += ball.vy;
 
-    // Bounce off top/bottom
+    // Bounce off top/bottom walls
     if (ball.y <= 0 || ball.y >= 100) {
       ball.vy *= -1;
     }
 
     const [leftPlayer, rightPlayer] = room.players;
 
-    // Paddle collision
+    // Left paddle collision
     if (leftPlayer && ball.x <= 2) {
       if (ball.y >= leftPlayer.y - 10 && ball.y <= leftPlayer.y + 10) {
         ball.vx *= -1;
@@ -57,6 +80,7 @@ function gameLoop() {
       }
     }
 
+    // Right paddle collision
     if (rightPlayer && ball.x >= 98) {
       if (ball.y >= rightPlayer.y - 10 && ball.y <= rightPlayer.y + 10) {
         ball.vx *= -1;
@@ -66,23 +90,16 @@ function gameLoop() {
       }
     }
 
-    // Broadcast updated game state
+    // Broadcast state
     io.to(roomId).emit("game_state", {
       players: room.players,
       ball: room.ball,
       score: room.score,
+      winner: null,
     });
   }
 }
 
-function resetBall(ball: { x: number; y: number; vx: number; vy: number }) {
-  ball.x = 50;
-  ball.y = 50;
-  ball.vx = Math.random() > 0.5 ? 0.5 : -0.5;
-  ball.vy = (Math.random() - 0.5) * 1;
-}
-
-// Run 60fps
 setInterval(gameLoop, 1000 / 60);
 
 io.on("connection", (socket) => {
@@ -108,6 +125,19 @@ io.on("connection", (socket) => {
     const player = room.players.find((p) => p.id === socket.id);
     if (player) {
       player.y = y;
+    }
+  });
+
+  socket.on("restart_game", (roomId: string) => {
+    const room = rooms[roomId];
+    if (room) {
+      resetGame(room);
+      io.to(roomId).emit("game_state", {
+        players: room.players,
+        ball: room.ball,
+        score: room.score,
+        winner: null,
+      });
     }
   });
 
