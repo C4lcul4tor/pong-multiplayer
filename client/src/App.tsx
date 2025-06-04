@@ -1,4 +1,3 @@
-// client/src/App.tsx
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
@@ -9,16 +8,30 @@ type Player = {
   y: number;
 };
 
+type Ball = {
+  x: number;
+  y: number;
+};
+
+type Score = {
+  left: number;
+  right: number;
+};
+
 function App() {
-  const [roomId, setRoomId] = useState("game1");
+  const [roomId] = useState("game1");
   const [players, setPlayers] = useState<Player[]>([]);
   const [myY, setMyY] = useState(50);
+  const [ball, setBall] = useState<Ball>({ x: 50, y: 50 });
+  const [score, setScore] = useState<Score>({ left: 0, right: 0 });
 
   useEffect(() => {
     socket.emit("join_room", roomId);
 
-    socket.on("players_update", (updatedPlayers: Player[]) => {
-      setPlayers(updatedPlayers);
+    socket.on("game_state", (data: { players: Player[]; ball: Ball; score: Score }) => {
+      setPlayers(data.players);
+      setBall(data.ball);
+      setScore(data.score);
     });
 
     return () => {
@@ -43,6 +56,11 @@ function App() {
         overflow: "hidden",
       }}
     >
+      <div style={{ position: "absolute", top: 10, left: "45%", color: "white" }}>
+        {score.left} : {score.right}
+      </div>
+
+      {/* Paddles */}
       {players.map((player, index) => (
         <div
           key={player.id}
@@ -57,6 +75,20 @@ function App() {
           }}
         />
       ))}
+
+      {/* Ball */}
+      <div
+        style={{
+          position: "absolute",
+          left: `${ball.x}%`,
+          top: `${ball.y}%`,
+          width: "20px",
+          height: "20px",
+          borderRadius: "50%",
+          background: "white",
+          transform: "translate(-50%, -50%)",
+        }}
+      />
     </div>
   );
 }
