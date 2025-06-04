@@ -10,15 +10,51 @@ const io = new Server(httpServer, {
   },
 });
 
-app.get("/", (_req, res) => {
-  res.send("Pong Server Running");
-});
+interface Player {
+  id: string;
+  y: number;
+}
+
+interface GameRoom {
+  players: Player[];
+}
+
+const rooms: Record<string, GameRoom> = {};
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  console.log("Player connected:", socket.id);
+
+  socket.on("join_room", (roomId: string) => {
+    if (!rooms[roomId]) {
+      rooms[roomId] = { players: [] };
+    }
+
+    if (rooms[roomId].players.length < 2) {
+      rooms[roomId].players.push({ id: socket.id, y: 50 });
+      socket.join(roomId);
+      console.log(`Player ${socket.id} joined room ${roomId}`);
+      io.to(roomId).emit("players_update", rooms[roomId].players);
+    }
+  });
+
+  socket.on("paddle_move", ({ roomId, y }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const player = room.players.find((p) => p.id === socket.id);
+    if (player) {
+      player.y = y;
+      io.to(roomId).emit("players_update", room.players);
+    }
+  });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    for (const roomId in rooms) {
+      const room = rooms[roomId];
+      room.players = room.players.filter((p) => p.id !== socket.id);
+      io.to(roomId).emit("players_update", room.players);
+    }
+    console.log("Player disconnected:", socket.id);
   });
 });
 
