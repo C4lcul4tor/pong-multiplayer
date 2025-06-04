@@ -75,9 +75,3 @@ For the Real-Time Game Assignment — Kutaisi International University
 
 ---
 
-## ✅ Git Commit & Push
-
-```bash
-git add README.md
-git commit -m "Step 12: Final README for project submission"
-git push
